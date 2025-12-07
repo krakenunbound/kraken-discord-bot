@@ -29,8 +29,8 @@ Documentation = "https://github.com/krakenunbound/kraken-discord-bot/wiki"
 "Bug Tracker" = "https://github.com/krakenunbound/kraken-discord-bot/issues"
 
 [tool.comfy]
-PublisherId = ""
-DisplayName = "kraken-discord-bot"
+PublisherId = "KrakenUnbound"
+DisplayName = "Kraken Discord Bot"
 Icon = ""
 includes = [] 
 # "requires-comfyui" = ">=1.0.0"  # ComfyUI version compatibility
