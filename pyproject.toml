@@ -29,7 +29,7 @@ Documentation = "https://github.com/krakenunbound/kraken-discord-bot/wiki"
 "Bug Tracker" = "https://github.com/krakenunbound/kraken-discord-bot/issues"
 
 [tool.comfy]
-PublisherId = "dcc39bc9-077a-4699-b4b0-23edb9a35733"
+PublisherId = "krakenunbound"
 DisplayName = "Kraken Discord Bot"
 Icon = ""
 includes = [] 
