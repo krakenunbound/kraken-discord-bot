@@ -17,23 +17,23 @@ A standalone ComfyUI custom node that turns your ComfyUI instance into a Discord
 
 ## Installation
 
-### Method 1: ComfyUI Manager (Recommended)
-1. Open ComfyUI Manager
-2. Search for "Kraken Discord Bot"
-3. Click Install
-
-### Method 2: Manual Installation
+### Method 1: Git Clone (Recommended)
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/yourusername/kraken-discord-bot.git
+git clone https://github.com/krakenunbound/kraken-discord-bot.git
 cd kraken-discord-bot
 pip install -r requirements.txt
 ```
 
-### Method 3: Download ZIP
+### Method 2: Download ZIP
 1. Download this repository as ZIP
 2. Extract to `ComfyUI/custom_nodes/kraken-discord-bot`
 3. Install requirements: `pip install discord.py requests`
+
+### Method 3: ComfyUI Manager (Coming Soon)
+1. Open ComfyUI Manager
+2. Search for "Kraken Discord Bot"
+3. Click Install
 
 ## Setup
 
