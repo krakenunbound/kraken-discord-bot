@@ -37,6 +37,15 @@ class ParsedCommand:
     channel_id: int = 0
     message_id: int = 0
 
+    # Prompt modifiers (quick tags)
+    modifiers: List[str] = field(default_factory=list)
+
+    # Enhancement flag
+    enhance: bool = False
+
+    # Upscale flag
+    upscale: bool = False
+
     # Raw parsed arguments for extensibility
     extra_args: Dict[str, Any] = field(default_factory=dict)
 
@@ -96,6 +105,57 @@ class CommandParser:
         "desktop": (1216, 832),
     }
 
+    # Quick modifier flags (boolean flags that add prompt tags)
+    # Format: flag_name -> (prefix_tag, suffix_tag)
+    MODIFIER_TAGS = {
+        # Quality modifiers
+        "masterpiece": ("masterpiece, best quality,", ""),
+        "detailed": ("", ", highly detailed, intricate details"),
+        "hd": ("", ", 8k uhd, high resolution, sharp focus"),
+        "professional": ("professional", ", high quality, expert craftsmanship"),
+
+        # Lighting modifiers
+        "cinematic": ("cinematic film still,", ", cinematic lighting, dramatic shadows, film grain, anamorphic"),
+        "dramatic": ("", ", dramatic lighting, dynamic shadows, high contrast"),
+        "soft": ("", ", soft lighting, gentle shadows, diffused light"),
+        "golden": ("", ", golden hour lighting, warm tones, sun flare"),
+        "neon": ("", ", neon lighting, cyberpunk glow, vibrant colors"),
+        "backlit": ("", ", backlighting, rim light, silhouette"),
+
+        # Atmosphere modifiers
+        "fog": ("", ", atmospheric fog, misty, hazy atmosphere"),
+        "mist": ("", ", light mist, ethereal atmosphere"),
+        "rain": ("", ", rainy atmosphere, wet surfaces, rain drops"),
+        "snow": ("", ", snowing, winter atmosphere, frost"),
+
+        # Time of day
+        "night": ("", ", nighttime, dark atmosphere, moonlight"),
+        "day": ("", ", daytime, bright daylight, clear sky"),
+        "sunset": ("", ", sunset, orange sky, warm colors, dusk"),
+        "dawn": ("", ", dawn, early morning, soft pink light"),
+
+        # Style modifiers
+        "epic": ("epic", ", grand scale, awe-inspiring, breathtaking"),
+        "dark": ("", ", dark and moody, ominous atmosphere, shadows"),
+        "vibrant": ("", ", vibrant colors, colorful, saturated"),
+        "muted": ("", ", muted colors, desaturated, subtle tones"),
+        "vintage": ("", ", vintage aesthetic, retro, nostalgic, film grain"),
+        "noir": ("", ", film noir style, black and white, high contrast, shadows"),
+
+        # Camera/technical
+        "bokeh": ("", ", bokeh, shallow depth of field, blurred background"),
+        "dof": ("", ", depth of field, focus blur, cinematic focus"),
+        "wideangle": ("", ", wide angle lens, expansive view"),
+        "macro": ("", ", macro photography, extreme close-up, detailed"),
+        "portrait": ("portrait shot of", ", portrait photography, shallow dof"),
+
+        # Artistic
+        "painterly": ("", ", painterly style, artistic brushstrokes"),
+        "ethereal": ("", ", ethereal, dreamlike, otherworldly"),
+        "gritty": ("", ", gritty, raw, textured, realistic"),
+        "clean": ("", ", clean lines, polished, refined"),
+    }
+
     def __init__(self, prefix: str = "!"):
         """
         Initialize parser with command prefix.
@@ -134,7 +194,7 @@ class CommandParser:
         remainder = parts[1] if len(parts) > 1 else ""
 
         # Parse the remainder for prompt and flags
-        prompt, flags = self._parse_flags(remainder)
+        prompt, flags, modifiers, enhance, upscale = self._parse_flags(remainder)
 
         # Process flag aliases
         resolved_flags = {}
@@ -181,38 +241,45 @@ class CommandParser:
             model=resolved_flags.get("model"),
             has_image=has_image,
             image_url=image_url,
+            modifiers=modifiers,
+            enhance=enhance,
+            upscale=upscale,
             extra_args={k: v for k, v in resolved_flags.items()
                        if k not in ["negative", "steps", "cfg", "width", "height", "seed", "style", "model"]},
         )
 
         return result
 
-    def _parse_flags(self, text: str) -> Tuple[str, Dict[str, Any]]:
+    def _parse_flags(self, text: str) -> Tuple[str, Dict[str, Any], List[str], bool, bool]:
         """
-        Parse text into prompt and flag dictionary.
+        Parse text into prompt, flag dictionary, and modifiers.
 
         Args:
             text: The text after the command name
 
         Returns:
-            Tuple of (prompt_text, flags_dict)
+            Tuple of (prompt_text, flags_dict, modifiers_list, enhance_bool, upscale_bool)
         """
         if not text:
-            return "", {}
+            return "", {}, [], False, False
 
         flags = {}
-        prompt_parts = []
+        modifiers = []
+        enhance = False
+        upscale = False
 
         # Split on -- flags while preserving quoted strings
-        # Pattern matches --flag value or --flag "quoted value"
-        pattern = r'--(\w+)(?:\s+(?:"([^"]+)"|(\S+)))?'
+        # Pattern matches --flag value or --flag "quoted value" or --flag (boolean)
+        # IMPORTANT: The value part must NOT match things starting with -- (other flags)
+        # Using negative lookahead (?!--) to prevent capturing the next flag as a value
+        pattern = r'--(\w+)(?:\s+(?:"([^"]+)"|(?!--)(\S+)))?'
 
         # Find all flag matches and their positions
         matches = list(re.finditer(pattern, text))
 
         if not matches:
             # No flags, entire text is prompt
-            return text, {}
+            return text, {}, [], False, False
 
         # Text before first flag is the prompt
         first_match_start = matches[0].start()
@@ -223,6 +290,28 @@ class CommandParser:
             flag_name = match.group(1).lower()
             # Value is either quoted (group 2) or unquoted (group 3)
             value = match.group(2) if match.group(2) else match.group(3)
+
+            # Check if it's an enhance flag
+            if flag_name == "enhance":
+                enhance = True
+                continue
+
+            # Check if it's an upscale flag
+            if flag_name == "upscale":
+                upscale = True
+                continue
+
+            # Check if it's a size preset shorthand flag
+            if flag_name in self.SIZE_PRESETS:
+                w, h = self.SIZE_PRESETS[flag_name]
+                flags["width"] = w
+                flags["height"] = h
+                continue
+
+            # Check if it's a modifier flag (boolean tag)
+            if flag_name in self.MODIFIER_TAGS:
+                modifiers.append(flag_name)
+                continue
 
             if value is None:
                 # Flag without value, treat as boolean
@@ -238,7 +327,41 @@ class CommandParser:
 
             flags[flag_name] = value
 
-        return prompt, flags
+        return prompt, flags, modifiers, enhance, upscale
+
+    def apply_modifiers(self, prompt: str, modifiers: List[str]) -> str:
+        """
+        Apply modifier tags to a prompt.
+
+        Args:
+            prompt: The base prompt
+            modifiers: List of modifier names to apply
+
+        Returns:
+            Modified prompt with tags added
+        """
+        if not modifiers:
+            return prompt
+
+        prefixes = []
+        suffixes = []
+
+        for mod in modifiers:
+            if mod in self.MODIFIER_TAGS:
+                prefix, suffix = self.MODIFIER_TAGS[mod]
+                if prefix:
+                    prefixes.append(prefix)
+                if suffix:
+                    suffixes.append(suffix)
+
+        # Build final prompt
+        result = prompt
+        if prefixes:
+            result = " ".join(prefixes) + " " + result
+        if suffixes:
+            result = result + " ".join(suffixes)
+
+        return result
 
     @staticmethod
     def _safe_int(value: Any) -> Optional[int]:
@@ -272,7 +395,7 @@ class CommandParser:
 
 **!help** - Show this help message
 
-**Optional Flags:**
+**Parameter Flags:**
   `--negative <text>` - What to avoid (e.g., `--negative blurry, ugly`)
   `--steps <1-50>` - Generation steps (default: 20)
   `--cfg <1-20>` - Guidance scale (default: 7)
@@ -280,20 +403,29 @@ class CommandParser:
   `--style <name>` - Style preset (see below)
   `--width <pixels>` - Image width (default: 1024)
   `--height <pixels>` - Image height (default: 1024)
+  `--enhance` - Use AI to expand your prompt (slower but better results)
+  `--upscale` - Upscale the image (if upscale model is configured)
 
-**Size Presets:** (use with --width)
-  `square` (1024x1024), `landscape` (1216x832), `portrait` (832x1216)
-  `wide` (1344x768), `tall` (768x1344)
+**Quick Modifier Flags** (add quality/style tags instantly):
+  *Quality:* `--masterpiece` `--detailed` `--hd` `--professional`
+  *Lighting:* `--cinematic` `--dramatic` `--soft` `--golden` `--neon` `--backlit`
+  *Atmosphere:* `--fog` `--mist` `--rain` `--snow`
+  *Time:* `--night` `--day` `--sunset` `--dawn`
+  *Style:* `--epic` `--dark` `--vibrant` `--muted` `--vintage` `--noir`
+  *Camera:* `--bokeh` `--dof` `--wideangle` `--macro` `--portrait`
+  *Artistic:* `--painterly` `--ethereal` `--gritty` `--clean`
+
+**Size Presets:** (use directly as flags!)
+  `--square` (1024x1024), `--landscape` (1216x832), `--portrait` (832x1216)
+  `--wide` (1344x768), `--tall` (768x1344), `--phone`, `--desktop`
 
 **Style Presets:**
-  `photorealistic` - Realistic photo style
-  `anime` - Anime/manga style
-  `fantasy` - Fantasy art style
-  `scifi` - Sci-fi style
-  `artistic` - Painterly artistic style
+  `photorealistic` `anime` `fantasy` `scifi` `artistic` `cinematic` `cute` `dark` `vintage` `minimalist`
 
 **Examples:**
-  `!generate a cyberpunk city at night --style scifi --steps 25`
-  `!generate portrait of a warrior --width portrait --style fantasy`
-  `!generate cute cat --negative ugly, blurry --seed 12345`
+  `!generate dracula's castle --cinematic --fog --night --masterpiece`
+  `!generate a cyberpunk city --style scifi --neon --rain --detailed`
+  `!generate cute cat --soft --vibrant --bokeh`
+  `!generate epic battle scene --enhance` (uses AI to expand prompt)
+  `!generate landscape photo --upscale` (generates and upscales)
 """

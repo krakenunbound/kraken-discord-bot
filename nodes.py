@@ -10,6 +10,7 @@ import random
 import json
 import hashlib
 import re
+import gc
 import torch
 import numpy as np
 from PIL import Image
@@ -17,6 +18,14 @@ from typing import Optional, Dict, Any, Tuple, List
 
 import requests
 import folder_paths
+
+# For prompt enhancement with Qwen2-VL-2B
+try:
+    from transformers import pipeline, AutoProcessor, Qwen2VLForConditionalGeneration
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+    print("[KrakenDiscordBot] transformers not found - prompt enhancement disabled")
 import comfy.sd
 import comfy.utils
 import comfy.sample
@@ -196,6 +205,9 @@ class KrakenDiscordBot:
     _cached_vae = None
     _cached_upscale_model = None
     _cached_upscale_model_name = None
+    # Cached LLM for prompt enhancement
+    _cached_llm_pipeline = None
+    _cached_llm_model_name = None
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -210,20 +222,25 @@ class KrakenDiscordBot:
         saved_width = get_config_value("default_width", 1024)
         saved_height = get_config_value("default_height", 1024)
 
+        # Get Discord token - show "Token Loaded" if saved, otherwise empty for input
+        saved_token = get_config_value("discord_token", "")
+        discord_token_display = "Token Loaded" if saved_token else ""
+
         # Check CivitAI API key status
         api_key_status = "Key Loaded" if load_civitai_api_key() else "No Key"
 
         return {
             "required": {
                 "discord_token": ("STRING", {
-                    "default": "",
+                    "default": discord_token_display,
                     "multiline": False,
                     "placeholder": "Paste Discord bot token here"
                 }),
                 "checkpoint": (checkpoints, {}),
                 "default_negative": ("STRING", {
                     "default": saved_negative,
-                    "multiline": True
+                    "multiline": True,
+                    "dynamicPrompts": True
                 }),
                 "default_steps": ("INT", {
                     "default": saved_steps,
@@ -259,27 +276,18 @@ class KrakenDiscordBot:
                 }),
             },
             "optional": {
-                # LoRA Settings
-                "lora": (loras, {"default": "None"}),
-                "lora_strength": ("FLOAT", {
-                    "default": 1.0,
-                    "min": -2.0,
-                    "max": 2.0,
-                    "step": 0.05
-                }),
-                "lora_clip_strength": ("FLOAT", {
-                    "default": 1.0,
-                    "min": -2.0,
-                    "max": 2.0,
-                    "step": 0.05
-                }),
-                "use_civitai_triggers": ("BOOLEAN", {
-                    "default": True
-                }),
-                "civitai_api_status": ("STRING", {
-                    "default": api_key_status,
-                    "multiline": False
-                }),
+                # LoRA 1
+                "lora_1": (loras, {"default": "None"}),
+                "lora_1_strength": ("FLOAT", {"default": 1.0, "min": -2.0, "max": 2.0, "step": 0.05}),
+                # LoRA 2
+                "lora_2": (loras, {"default": "None"}),
+                "lora_2_strength": ("FLOAT", {"default": 1.0, "min": -2.0, "max": 2.0, "step": 0.05}),
+                # LoRA 3
+                "lora_3": (loras, {"default": "None"}),
+                "lora_3_strength": ("FLOAT", {"default": 1.0, "min": -2.0, "max": 2.0, "step": 0.05}),
+                # CivitAI
+                "use_civitai_triggers": ("BOOLEAN", {"default": True}),
+                "civitai_api_status": ("STRING", {"default": api_key_status, "multiline": False}),
                 # Upscale Settings
                 "upscale_model": (upscale_models, {"default": "None"}),
                 # Bot Settings
@@ -391,23 +399,38 @@ class KrakenDiscordBot:
         print(f"[KrakenDiscordBot] Loading upscale model: {model_name}")
         model_path = folder_paths.get_full_path("upscale_models", model_name)
 
-        if HAS_SPANDREL:
-            upscale_model = ModelLoader().load_from_file(model_path).model.eval()
-        elif model_loading:
-            sd = comfy.utils.load_torch_file(model_path)
-            upscale_model = model_loading.load_state_dict(sd).eval()
-        else:
-            print("[KrakenDiscordBot] Warning: No upscale model loader available")
+        if not model_path:
+            print(f"[KrakenDiscordBot] ERROR: Could not find upscale model path for: {model_name}")
             return None
 
-        device = model_management.get_torch_device()
-        upscale_model = upscale_model.to(device)
+        try:
+            if HAS_SPANDREL:
+                print(f"[KrakenDiscordBot] Using Spandrel to load: {model_path}")
+                upscale_model = ModelLoader().load_from_file(model_path).model.eval()
+            elif model_loading:
+                print(f"[KrakenDiscordBot] Using model_loading to load: {model_path}")
+                sd = comfy.utils.load_torch_file(model_path)
+                upscale_model = model_loading.load_state_dict(sd).eval()
+            else:
+                print("[KrakenDiscordBot] ERROR: No upscale model loader available (spandrel or model_loading)")
+                print("[KrakenDiscordBot] Try: pip install spandrel")
+                return None
 
-        # Cache for next use
-        KrakenDiscordBot._cached_upscale_model = upscale_model
-        KrakenDiscordBot._cached_upscale_model_name = model_name
+            device = model_management.get_torch_device()
+            upscale_model = upscale_model.to(device)
 
-        return upscale_model
+            # Cache for next use
+            KrakenDiscordBot._cached_upscale_model = upscale_model
+            KrakenDiscordBot._cached_upscale_model_name = model_name
+
+            print(f"[KrakenDiscordBot] Upscale model loaded successfully: {model_name}")
+            return upscale_model
+
+        except Exception as e:
+            print(f"[KrakenDiscordBot] ERROR loading upscale model: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def _upscale_image(self, upscale_model, image: torch.Tensor) -> torch.Tensor:
         """Upscale image using the loaded model."""
@@ -442,6 +465,166 @@ class KrakenDiscordBot:
         print(f"[KrakenDiscordBot] Upscaled from {image.shape} to {upscaled.shape}")
 
         return upscaled.cpu()
+
+    def _load_llm(self, model_name: str = "Qwen/Qwen2-VL-2B-Instruct"):
+        """Load LLM for prompt enhancement, using cache if available."""
+        if not HAS_TRANSFORMERS:
+            print("[KrakenDiscordBot] transformers not installed - cannot enhance prompts")
+            return None
+
+        if (self._cached_llm_model_name == model_name and
+            self._cached_llm_pipeline is not None):
+            print(f"[KrakenDiscordBot] Using cached LLM: {model_name}")
+            return self._cached_llm_pipeline
+
+        print(f"[KrakenDiscordBot] Loading LLM for prompt enhancement: {model_name}")
+        print("[KrakenDiscordBot] This may take a moment on first use (downloading model)...")
+
+        try:
+            has_cuda = torch.cuda.is_available()
+            processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+            model = Qwen2VLForConditionalGeneration.from_pretrained(
+                model_name,
+                torch_dtype=torch.float16 if has_cuda else torch.float32,
+                low_cpu_mem_usage=True,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            if processor.tokenizer.pad_token_id is None:
+                processor.tokenizer.pad_token = processor.tokenizer.eos_token
+
+            llm_pipeline = pipeline(
+                "text-generation",
+                model=model,
+                tokenizer=processor.tokenizer,
+                processor=processor,
+                device_map="auto",
+            )
+
+            # Cache for reuse
+            KrakenDiscordBot._cached_llm_pipeline = llm_pipeline
+            KrakenDiscordBot._cached_llm_model_name = model_name
+
+            print("[KrakenDiscordBot] LLM loaded successfully")
+            return llm_pipeline
+
+        except Exception as e:
+            print(f"[KrakenDiscordBot] Failed to load LLM: {e}")
+            return None
+
+    def _unload_llm(self):
+        """Unload LLM to free VRAM."""
+        if self._cached_llm_pipeline is not None:
+            print("[KrakenDiscordBot] Unloading LLM to free VRAM...")
+            try:
+                del KrakenDiscordBot._cached_llm_pipeline
+            except:
+                pass
+            KrakenDiscordBot._cached_llm_pipeline = None
+            KrakenDiscordBot._cached_llm_model_name = None
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+
+    def _enhance_prompt(self, prompt: str, style: str = "sdxl") -> Tuple[str, str]:
+        """
+        Enhance a simple prompt using Qwen2-VL-2B.
+
+        Args:
+            prompt: The user's simple prompt
+            style: Enhancement style ("sdxl", "anime", "instructional")
+
+        Returns:
+            Tuple of (enhanced_prompt, original_prompt)
+        """
+        if not prompt or not prompt.strip():
+            return prompt, prompt
+
+        original = prompt.strip()
+
+        llm = self._load_llm()
+        if llm is None:
+            print("[KrakenDiscordBot] LLM not available, returning original prompt")
+            return original, original
+
+        # Style-specific instructions
+        style_instructions = {
+            "sdxl": (
+                "Rewrite the following concept into a single, highly descriptive and visually rich prompt for a modern text-to-image AI. "
+                "Focus on composition, lighting, textures, atmosphere, and camera language. "
+                "Add vivid details about colors, materials, environment, and mood. "
+                "Keep it under 200 words. Do not add commentary or disclaimers. Output only the enhanced prompt."
+            ),
+            "anime": (
+                "Convert the following concept into a comma-separated list of high-signal tags in danbooru/booru style. "
+                "Include quality tags like 'masterpiece, best quality, detailed'. "
+                "Add relevant style, lighting, and composition tags. Keep it one line. Output only the tags."
+            ),
+            "instructional": (
+                "Express the following concept as one concise but detailed imperative sentence that fully describes the scene. "
+                "Include visual details about lighting, composition, and atmosphere. "
+                "Avoid extra words and meta text. Output only the description."
+            ),
+        }
+
+        # Determine style based on input or default to sdxl
+        instruction = style_instructions.get(style.lower(), style_instructions["sdxl"])
+
+        try:
+            processor = llm.processor
+
+            conversation = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"{instruction}\n\nConcept: '{original}'"}
+                    ],
+                }
+            ]
+
+            text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+            inputs = processor(text=[text_prompt], padding=True, return_tensors="pt")
+            inputs = inputs.to(llm.device)
+
+            print(f"[KrakenDiscordBot] Enhancing prompt with LLM...")
+
+            with torch.inference_mode():
+                gen_kwargs = {
+                    "max_new_tokens": 256,
+                    "do_sample": True,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "repetition_penalty": 1.12,
+                    "pad_token_id": processor.tokenizer.pad_token_id,
+                    "eos_token_id": processor.tokenizer.eos_token_id,
+                }
+                output_ids = llm.model.generate(**inputs, **gen_kwargs)
+
+            # Extract generated text (skip the input prompt tokens)
+            generated_ids = [
+                output_ids[i, inputs.input_ids[i].shape[0]:]
+                for i in range(output_ids.shape[0])
+            ]
+            enhanced = processor.batch_decode(
+                generated_ids,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False
+            )[0].strip()
+
+            # Clean up any remaining artifacts
+            enhanced = enhanced.replace("Enhanced prompt:", "").replace("Output:", "").strip()
+
+            print(f"[KrakenDiscordBot] Enhanced: {enhanced[:100]}...")
+
+            # Unload LLM immediately to free VRAM for image generation
+            self._unload_llm()
+
+            return enhanced, original
+
+        except Exception as e:
+            print(f"[KrakenDiscordBot] Enhancement failed: {e}")
+            self._unload_llm()
+            return original, original
 
     def _encode_prompt(self, clip, text: str) -> List:
         """Encode text prompt to conditioning."""
@@ -587,9 +770,12 @@ class KrakenDiscordBot:
         sampler_name: str,
         scheduler: str,
         denoise: float,
-        lora: str = "None",
-        lora_strength: float = 1.0,
-        lora_clip_strength: float = 1.0,
+        lora_1: str = "None",
+        lora_1_strength: float = 1.0,
+        lora_2: str = "None",
+        lora_2_strength: float = 1.0,
+        lora_3: str = "None",
+        lora_3_strength: float = 1.0,
         use_civitai_triggers: bool = True,
         civitai_api_status: str = "",
         upscale_model: str = "None",
@@ -610,8 +796,9 @@ class KrakenDiscordBot:
         # Set up config
         config = get_config()
 
-        # Handle token - if user provides one, save it; otherwise use saved one
-        if discord_token and discord_token.strip() and not config.is_masked(discord_token):
+        # Handle token - if user provides a new one, save it
+        # "Token Loaded" means we already have a saved token, so don't overwrite
+        if discord_token and discord_token.strip() and discord_token != "Token Loaded" and not config.is_masked(discord_token):
             print(f"[KrakenDiscordBot] Saving Discord token...")
             config.token = discord_token.strip()
             print(f"[KrakenDiscordBot] Token saved!")
@@ -669,19 +856,52 @@ class KrakenDiscordBot:
             # Load model
             model, clip, vae = self._load_checkpoint(checkpoint)
 
-            # Apply LoRA if selected
-            trigger_words = ""
-            if lora and lora != "None":
-                model, clip, trigger_words = self._apply_lora(
-                    model, clip, lora, lora_strength, lora_clip_strength, use_civitai_triggers
-                )
+            # Apply all 3 LoRAs if selected
+            all_triggers = []
+            lora_names_used = []
+            lora_slots = [
+                (lora_1, lora_1_strength),
+                (lora_2, lora_2_strength),
+                (lora_3, lora_3_strength),
+            ]
+
+            for lora_name, strength in lora_slots:
+                if lora_name and lora_name != "None":
+                    model, clip, triggers = self._apply_lora(
+                        model, clip, lora_name, strength, strength, use_civitai_triggers
+                    )
+                    if triggers:
+                        all_triggers.append(triggers)
+                    lora_names_used.append(os.path.splitext(os.path.basename(lora_name))[0])
 
             # Get parameters (use context values or defaults)
             prompt = context.prompt
+            original_prompt = prompt  # Store original for Discord reporting
+
+            # Apply LLM enhancement if requested (--enhance flag)
+            enhanced_prompt = None
+            if hasattr(context, 'enhance') and context.enhance:
+                print(f"[KrakenDiscordBot] User requested prompt enhancement via --enhance flag")
+                # Determine enhancement style based on selected style preset
+                enhance_style = "sdxl"  # Default
+                if context.style and context.style.lower() == "anime":
+                    enhance_style = "anime"
+                enhanced_prompt, original_prompt = self._enhance_prompt(prompt, enhance_style)
+                prompt = enhanced_prompt
+                print(f"[KrakenDiscordBot] Original: {original_prompt[:60]}...")
+                print(f"[KrakenDiscordBot] Enhanced: {prompt[:60]}...")
+
+            # Apply quick modifiers (--cinematic, --fog, --masterpiece, etc.)
+            if hasattr(context, 'modifiers') and context.modifiers:
+                from .kraken_discord.parsers import CommandParser
+                parser = CommandParser()
+                prompt = parser.apply_modifiers(prompt, context.modifiers)
+                print(f"[KrakenDiscordBot] Applied modifiers {context.modifiers}: {prompt[:80]}...")
 
             # Prepend trigger words if we have them
-            if trigger_words:
-                prompt = f"{trigger_words}, {prompt}"
+            if all_triggers:
+                trigger_str = ", ".join(all_triggers)
+                prompt = f"{trigger_str}, {prompt}"
                 print(f"[KrakenDiscordBot] Final prompt with triggers: {prompt[:100]}...")
 
             negative = context.negative_prompt or default_negative
@@ -724,9 +944,17 @@ class KrakenDiscordBot:
             print("[KrakenDiscordBot] Decoding...")
             images = self._decode_latent(vae, sampled)
 
-            # Upscale if model is loaded
-            if upscale_model_loaded is not None:
-                images = self._upscale_image(upscale_model_loaded, images)
+            # Upscale if user requested it via --upscale flag AND model is loaded
+            did_upscale = False
+            print(f"[KrakenDiscordBot] Upscale check: context.upscale={getattr(context, 'upscale', 'N/A')}, model_loaded={upscale_model_loaded is not None}")
+            if hasattr(context, 'upscale') and context.upscale:
+                if upscale_model_loaded is not None:
+                    print("[KrakenDiscordBot] User requested upscale via --upscale flag - UPSCALING NOW")
+                    images = self._upscale_image(upscale_model_loaded, images)
+                    did_upscale = True
+                    print(f"[KrakenDiscordBot] Upscale complete, did_upscale={did_upscale}")
+                else:
+                    print("[KrakenDiscordBot] User requested --upscale but no upscale model configured in node")
 
             gen_time = time.time() - start_time
             print(f"[KrakenDiscordBot] Generated in {gen_time:.1f}s")
@@ -752,13 +980,29 @@ class KrakenDiscordBot:
             )
 
             # Add LoRA info to embed if used
-            if lora and lora != "None":
-                lora_name = os.path.splitext(os.path.basename(lora))[0]
+            if lora_names_used:
                 embed_data["fields"] = embed_data.get("fields", [])
                 embed_data["fields"].append({
-                    "name": "LoRA",
-                    "value": f"{lora_name} ({lora_strength})",
+                    "name": "LoRAs",
+                    "value": ", ".join(lora_names_used),
                     "inline": True
+                })
+
+            # Add enhancement info to embed (show before/after for testing)
+            if enhanced_prompt is not None:
+                embed_data["fields"] = embed_data.get("fields", [])
+                # Truncate long prompts for display
+                orig_display = original_prompt[:200] + "..." if len(original_prompt) > 200 else original_prompt
+                enh_display = enhanced_prompt[:500] + "..." if len(enhanced_prompt) > 500 else enhanced_prompt
+                embed_data["fields"].append({
+                    "name": "Original Prompt",
+                    "value": f"```{orig_display}```",
+                    "inline": False
+                })
+                embed_data["fields"].append({
+                    "name": "Enhanced Prompt",
+                    "value": f"```{enh_display}```",
+                    "inline": False
                 })
 
             # Send to Discord

@@ -1,0 +1,242 @@
+{
+  "id": "c1cf7c38-8311-4384-aba8-b221fbf78366",
+  "revision": 0,
+  "last_node_id": 10,
+  "last_link_id": 3,
+  "nodes": [
+    {
+      "id": 7,
+      "type": "PreviewImage",
+      "pos": [
+        734.0735121822928,
+        231.09778550548776
+      ],
+      "size": [
+        803.8673636363637,
+        903.9950909090912
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 3
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.76",
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [],
+      "color": "#222",
+      "bgcolor": "#000",
+      "shape": 1
+    },
+    {
+      "id": 5,
+      "type": "Note",
+      "pos": [
+        240.83158184345862,
+        183.49446369438638
+      ],
+      "size": [
+        304,
+        88
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "*WARNING*",
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "This will not function until you put in your Discord bot token here."
+      ],
+      "color": "#322",
+      "bgcolor": "#533",
+      "shape": 4
+    },
+    {
+      "id": 9,
+      "type": "KrakenDiscordBot",
+      "pos": [
+        48.63788078207481,
+        231.33106121599008
+      ],
+      "size": [
+        662.2069999999999,
+        899.4609999999998
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "generated_image",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "kraken-discord-bot",
+        "ver": "48cf08aae4e7b33087eed7294bb885f530263076",
+        "Node name for S&R": "KrakenDiscordBot",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "Token Loaded",
+        "SDXL\\omnium_v11.safetensors",
+        "embedding:sdxl\\Endless_Up_SDXL_Neg, \n",
+        35,
+        4,
+        1024,
+        1024,
+        "dpmpp_2m",
+        "karras",
+        1,
+        "sdxl\\Fantasy with epic details - XL SDXL v1.0.safetensors",
+        0.7,
+        "sdxl\\MJ52.safetensors",
+        0.6,
+        "sdxl\\PerfectEyesXL.safetensors",
+        0.4,
+        true,
+        "Key Loaded",
+        "RealESRGAN_x2.pth",
+        30,
+        10,
+        ""
+      ],
+      "color": "#28075B",
+      "bgcolor": "#200747",
+      "shape": 1
+    },
+    {
+      "id": 4,
+      "type": "MarkdownNote",
+      "pos": [
+        -560.692130601054,
+        229.3765054140675
+      ],
+      "size": [
+        589.0909090909091,
+        903.6363636363634
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "# 🚀 GPU Model Guide — Pick the Right Model for Your Hardware\n\nChoose the model type that best fits your GPU. This keeps performance smooth and avoids out-of-memory errors.\n\n---\n\n## 🟦 Using a 4GB NVIDIA GPU?\n\nSmall but mighty! Stick with **SD 1.5 lightweight models**.\n\n### Recommended:\n- **DreamShaper (SD 1.5)**  \n  👉 [https://civitai.com/models/4384/dreamshaper](https://civitai.com/models/4384/dreamshaper)\n\n### Helpful SD 1.5 Add-Ons\n- **Negative Embedding:** BadDream / UnrealisticDream  \n  👉 [https://civitai.com/models/72437/baddream-unrealisticdream-negative-embeddings?modelVersionId=77169](https://civitai.com/models/72437/baddream-unrealisticdream-negative-embeddings?modelVersionId=77169)\n\n- **LoRA:** Add More Details (Detail Enhancer)  \n  👉 [https://civitai.com/models/82098/add-more-details-detail-enhancer-tweaker-lora?modelVersionId=87153](https://civitai.com/models/82098/add-more-details-detail-enhancer-tweaker-lora?modelVersionId=87153)\n\n---\n\n## 🟩 Using an 8GB NVIDIA GPU?\n\nYou can comfortably run **SDXL models**, as long as they’re optimized.\n\n### Recommended:\n- **Omnium SDXL Model**  \n  👉 [https://civitai.com/models/194245/omnium](https://civitai.com/models/194245/omnium)\n\n### SDXL Add-Ons\n- **Negative Embedding (SDXL): EndlessUpsDXLneg**  \n  👉 [https://civitai.com/models/172271/endlessupsdxlneg?modelVersionId=193479](https://civitai.com/models/172271/endlessupsdxlneg?modelVersionId=193479)\n\n- **SDXL LoRA Suggestions:**  \n  • Fantasy With Epic Details XL  \n    👉 [https://civitai.com/models/616944/fantasy-with-epic-details-xl](https://civitai.com/models/616944/fantasy-with-epic-details-xl)  \n  • Midjourney Mimic  \n    👉 [https://civitai.com/models/251417/midjourney-mimic](https://civitai.com/models/251417/midjourney-mimic)\n\n---\n\n## 🔧 Important: Install the Upscale Model\n\nMake sure to use the **ComfyUI Model Manager** to install:\n\n- **RealESRGAN_x2** (Upscaler)\n\n---\n\n# 🤖 Quick Setup Guide — Discord Bot Token\n\n## 1️⃣ Get Your Bot Token\n\n1. Go to:  \n   👉 [https://discord.com/developers/applications](https://discord.com/developers/applications)  \n2. Select your application (or create a new one)  \n3. Open **Bot** in the left sidebar  \n4. Click **Reset Token** → copy the new token  \n5. Paste it into the `set_new_token` field in the node  \n6. Under **Privileged Gateway Intents**, enable:  \n   - ✅ **Message Content Intent**\n\n---\n\n## 2️⃣ Invite Your Bot to Your Server\n\n1. Go to **OAuth2 → URL Generator**  \n2. Under **Scopes**, check:  \n   - ✔️ `bot`  \n3. Under **Bot Permissions**, enable:  \n   - ✔️ Send Messages  \n   - ✔️ Read Message History  \n   - ✔️ Attach Files  \n   - ✔️ Add Reactions  \n4. Copy the generated URL  \n5. Open it, select your server, and invite the bot\n\n---\n\n## ✔️ Final Notes\n\n- After entering your token once and queueing the node, the token is saved securely and will appear masked next time.  \n- **Important:** Set the **Run Mode** to **Instant**  \n  - Click the arrow next to **Run**  \n  - Select **Instant** so the node processes messages immediately.\n\n🎉 You’re all set!\n"
+      ],
+      "color": "#341b5b",
+      "bgcolor": "#200747",
+      "shape": 1
+    },
+    {
+      "id": 10,
+      "type": "MarkdownNote",
+      "pos": [
+        1562.3743426591498,
+        236.60300103414107
+      ],
+      "size": [
+        636.3299,
+        899.2856999999999
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "# 🐙 KRAKEN DISCORD BOT — COMMAND REFERENCE\n\nYour complete guide to generating stunning images directly inside Discord.\n\n---\n\n## ⚡ Commands\n\n| Command | Description |\n|--------|-------------|\n| **!generate \\<prompt>** | Generate an image from text |\n| **!img2img \\<prompt>** | Transform an attached image using your prompt |\n| **!help** | Display help inside Discord |\n| **!status** | Show queue and processing status |\n\n---\n\n## 🎛️ Parameters\n\n### Generation Controls\n- **--negative \\<text>**  \n  Specify what to avoid (examples: `--negative blurry, distorted`)\n- **--steps \\<1–50>**  \n  Number of generations steps *(default: 20)*\n- **--cfg \\<1–20>**  \n  Prompt guidance strength *(default: 7)*\n- **--seed \\<number>**  \n  Use a specific seed for repeatable results\n- **--style \\<name>**  \n  Apply a preset style (see style list below)\n- **--enhance**  \n  Expands and improves your prompt using AI *(slower, higher quality)*\n- **--upscale**  \n  Upscales the final image *(requires an upscaler model configured)*\n\n---\n\n## 🖼️ Size Presets\n\nUse these flags to quickly set your aspect ratio:\n\n- **--square** → 1024 × 1024 *(default)*\n- **--portrait** → 832 × 1216  \n- **--landscape** → 1216 × 832  \n- **--wide** → 1344 × 768  \n- **--tall** → 768 × 1344  \n- **--phone** → 832 × 1216 *(same as portrait)*\n- **--desktop** → 1216 × 832 *(same as landscape)*\n\n---\n\n## 🎨 Style Presets  \n*(Use with `--style <name>`)*\n\n`photorealistic`, `anime`, `fantasy`, `scifi`,  \n`artistic`, `cinematic`, `cute`, `dark`,  \n`vintage`, `minimalist`\n\n---\n\n## ✨ Quick Modifiers  \nAdd these to enhance quality, lighting, style, and mood.\n\n### Quality\n`--masterpiece` `--detailed` `--hd` `--professional`\n\n### Lighting\n`--cinematic` `--dramatic` `--soft` `--golden`  \n`--neon` `--backlit`\n\n### Atmosphere\n`--fog` `--mist` `--rain` `--snow`\n\n### Time of Day\n`--night` `--day` `--sunset` `--dawn`\n\n### Style Themes\n`--epic` `--dark` `--vibrant` `--muted`  \n`--vintage` `--noir`\n\n### Camera Effects\n`--bokeh` `--dof` `--wideangle` `--macro`\n\n### Artistic Flair\n`--painterly` `--ethereal` `--gritty` `--clean`\n\n---\n\n## 🧪 Examples\n\n\n"
+      ],
+      "color": "#341b5b",
+      "bgcolor": "#200747",
+      "shape": 1
+    }
+  ],
+  "links": [
+    [
+      3,
+      9,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "Kraken Discord Bot AiO",
+      "bounding": [
+        -570.692130601054,
+        155.4020930617465,
+        2796.183967878834,
+        1003.1218759886843
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "workflowRendererVersion": "LG",
+    "ue_links": [],
+    "ds": {
+      "scale": 0.683013455365071,
+      "offset": [
+        1016.1917573408532,
+        322.5731989658591
+      ]
+    },
+    "links_added_by_ue": [],
+    "frontendVersion": "1.32.10",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

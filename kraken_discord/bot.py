@@ -78,6 +78,11 @@ class DiscordContext:
     user_name: str = ""
     channel_id: int = 0
 
+    # Prompt modifiers and enhancement
+    modifiers: List[str] = field(default_factory=list)
+    enhance: bool = False
+    upscale: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -96,6 +101,9 @@ class DiscordContext:
             "user_id": self.user_id,
             "user_name": self.user_name,
             "channel_id": self.channel_id,
+            "modifiers": self.modifiers,
+            "enhance": self.enhance,
+            "upscale": self.upscale,
         }
 
 
@@ -342,9 +350,84 @@ class KrakenDiscordBot:
             return CommandType.UNKNOWN
 
     async def _send_help(self, message: Message) -> None:
-        """Send help message."""
-        help_text = self.parser.get_help_text()
-        await message.reply(help_text)
+        """Send help message as an embed to avoid 2000 char limit."""
+        prefix = self.config.get("command_prefix", "!")
+
+        embed = Embed(
+            title="🐙 Kraken Discord Bot - Commands",
+            color=0x9B59B6  # Purple
+        )
+
+        # Commands
+        embed.add_field(
+            name="📝 Commands",
+            value=(
+                f"`{prefix}generate <prompt>` - Generate an image\n"
+                f"`{prefix}img2img <prompt>` - Transform attached image\n"
+                f"`{prefix}help` - Show this help\n"
+                f"`{prefix}status` - Show queue status"
+            ),
+            inline=False
+        )
+
+        # Parameters
+        embed.add_field(
+            name="⚙️ Parameters",
+            value=(
+                "`--negative <text>` - What to avoid\n"
+                "`--steps <1-50>` - Generation steps\n"
+                "`--cfg <1-20>` - Guidance scale\n"
+                "`--seed <number>` - Reproducible seed\n"
+                "`--style <name>` - Style preset\n"
+                "`--enhance` - AI prompt expansion\n"
+                "`--upscale` - Upscale result"
+            ),
+            inline=True
+        )
+
+        # Size presets
+        embed.add_field(
+            name="📐 Sizes",
+            value=(
+                "`--square` 1024x1024\n"
+                "`--portrait` 832x1216\n"
+                "`--landscape` 1216x832\n"
+                "`--wide` 1344x768\n"
+                "`--tall` 768x1344"
+            ),
+            inline=True
+        )
+
+        # Modifiers
+        embed.add_field(
+            name="✨ Quick Modifiers",
+            value=(
+                "*Quality:* `--masterpiece` `--detailed` `--hd`\n"
+                "*Lighting:* `--cinematic` `--dramatic` `--golden` `--neon`\n"
+                "*Atmosphere:* `--fog` `--rain` `--snow` `--night` `--sunset`\n"
+                "*Style:* `--epic` `--dark` `--vibrant` `--vintage` `--noir`\n"
+                "*Camera:* `--bokeh` `--wideangle` `--macro`"
+            ),
+            inline=False
+        )
+
+        # Style presets
+        embed.add_field(
+            name="🎨 Style Presets",
+            value="`photorealistic` `anime` `fantasy` `scifi` `artistic` `cinematic` `cute` `dark` `vintage` `minimalist`",
+            inline=False
+        )
+
+        # Example
+        embed.add_field(
+            name="💡 Example",
+            value=f"`{prefix}generate a dragon on a mountain --cinematic --fog --enhance --upscale`",
+            inline=False
+        )
+
+        embed.set_footer(text="🐙 Release the Kraken!")
+
+        await message.reply(embed=embed)
 
     async def _send_status(self, message: Message) -> None:
         """Send status message."""
@@ -428,6 +511,9 @@ class KrakenDiscordBot:
             user_id=parsed.user_id,
             user_name=parsed.user_name,
             channel_id=parsed.channel_id,
+            modifiers=parsed.modifiers if hasattr(parsed, 'modifiers') else [],
+            enhance=parsed.enhance if hasattr(parsed, 'enhance') else False,
+            upscale=parsed.upscale if hasattr(parsed, 'upscale') else False,
         )
 
         return context
