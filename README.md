@@ -181,13 +181,17 @@ Use with `--style <name>`:
 - Make sure you have enough VRAM
 
 ### --enhance not working
-- Requires `transformers` library: `pip install transformers`
+- Requires `transformers` and `accelerate` libraries
+- **Standard install:** `pip install transformers accelerate`
+- **Portable ComfyUI:** `.\python_embeded\python.exe -m pip install transformers accelerate`
 - First use downloads Qwen2-VL-2B (~4GB)
 - Needs additional VRAM (unloads after enhancement)
 
 ### --upscale not working
 - Select an upscale model in the node settings
-- Requires `spandrel` library: `pip install spandrel`
+- Requires `spandrel` library
+- **Standard install:** `pip install spandrel`
+- **Portable ComfyUI:** `.\python_embeded\python.exe -m pip install spandrel`
 
 ## Requirements
 
@@ -195,7 +199,7 @@ Use with `--style <name>`:
 - Python 3.10+
 - discord.py >= 2.0
 - requests
-- transformers (optional, for --enhance)
+- transformers + accelerate (optional, for --enhance)
 - spandrel (optional, for --upscale)
 - A Discord bot token
 - GPU with sufficient VRAM for your chosen model
